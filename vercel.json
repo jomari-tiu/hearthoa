@@ -1,0 +1,7 @@
+{
+  "crons": [
+    { "path": "/api/cron/auto-unpin", "schedule": "0 * * * *" },
+    { "path": "/api/cron/auto-close-maintenance", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/late-dues", "schedule": "0 4 * * *" }
+  ]
+}

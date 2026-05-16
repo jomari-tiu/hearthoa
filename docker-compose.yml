@@ -1,0 +1,20 @@
+services:
+  db:
+    image: ankane/pgvector:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hearthhoa
+    ports:
+      - "5432:5432"
+    volumes:
+      - hearthhoa-pg:/var/lib/postgresql/data
+
+  mail:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  hearthhoa-pg:

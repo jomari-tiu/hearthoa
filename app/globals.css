@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === HearthHOA design tokens (ported from sandbox/src/tokens.css) === */
+:root {
+  --hue: 150;
+  --chroma: 0.09;
+  --radius: 8px;
+  --density: 1;
+
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) * 1.5);
+  --radius-xl: calc(var(--radius) * 2);
+  --radius-pill: 999px;
+
+  --row-h: calc(28px * var(--density));
+  --row-h-md: calc(32px * var(--density));
+  --row-h-lg: calc(40px * var(--density));
+}
+
+:root,
+[data-theme="light"] {
+  --primary: oklch(55% var(--chroma) var(--hue));
+  --primary-hover: oklch(48% var(--chroma) var(--hue));
+  --primary-active: oklch(42% var(--chroma) var(--hue));
+  --primary-fg: oklch(99% 0.003 var(--hue));
+  --primary-soft: oklch(95% 0.035 var(--hue));
+  --primary-soft-fg: oklch(35% 0.08 var(--hue));
+  --primary-ring: oklch(55% var(--chroma) var(--hue) / 0.25);
+
+  --bg: oklch(98.5% 0.004 var(--hue));
+  --bg-app: oklch(96.5% 0.006 var(--hue));
+  --surface: oklch(100% 0 0);
+  --surface-2: oklch(97.5% 0.005 var(--hue));
+  --surface-hover: oklch(96% 0.008 var(--hue));
+  --border: oklch(91% 0.008 var(--hue));
+  --border-strong: oklch(82% 0.012 var(--hue));
+  --fg: oklch(22% 0.012 var(--hue));
+  --fg-muted: oklch(46% 0.012 var(--hue));
+  --fg-subtle: oklch(62% 0.012 var(--hue));
+
+  --danger: oklch(57% 0.17 25);
+  --danger-hover: oklch(50% 0.18 25);
+  --danger-soft: oklch(96% 0.025 25);
+  --danger-soft-fg: oklch(40% 0.15 25);
+
+  --warning: oklch(70% 0.14 75);
+  --warning-soft: oklch(96% 0.04 80);
+  --warning-soft-fg: oklch(40% 0.10 60);
+
+  --info: oklch(58% 0.13 240);
+  --info-soft: oklch(96% 0.025 240);
+  --info-soft-fg: oklch(38% 0.12 240);
+
+  --success: oklch(58% 0.13 150);
+  --success-soft: oklch(95% 0.04 150);
+  --success-soft-fg: oklch(34% 0.10 150);
+
+  --shadow-sm: 0 1px 2px oklch(20% 0.02 var(--hue) / 0.06);
+  --shadow: 0 1px 3px oklch(20% 0.02 var(--hue) / 0.06), 0 6px 16px oklch(20% 0.02 var(--hue) / 0.05);
+  --shadow-lg: 0 4px 16px oklch(20% 0.02 var(--hue) / 0.10), 0 24px 56px oklch(20% 0.02 var(--hue) / 0.10);
+}
+
+[data-theme="dark"] {
+  --primary: oklch(72% 0.10 var(--hue));
+  --primary-hover: oklch(78% 0.10 var(--hue));
+  --primary-active: oklch(82% 0.10 var(--hue));
+  --primary-fg: oklch(18% 0.02 var(--hue));
+  --primary-soft: oklch(28% 0.045 var(--hue));
+  --primary-soft-fg: oklch(85% 0.07 var(--hue));
+  --primary-ring: oklch(72% 0.10 var(--hue) / 0.35);
+
+  --bg: oklch(15% 0.012 var(--hue));
+  --bg-app: oklch(12% 0.010 var(--hue));
+  --surface: oklch(18% 0.013 var(--hue));
+  --surface-2: oklch(21% 0.015 var(--hue));
+  --surface-hover: oklch(24% 0.018 var(--hue));
+  --border: oklch(26% 0.015 var(--hue));
+  --border-strong: oklch(34% 0.02 var(--hue));
+  --fg: oklch(94% 0.012 var(--hue));
+  --fg-muted: oklch(70% 0.012 var(--hue));
+  --fg-subtle: oklch(55% 0.012 var(--hue));
+
+  --danger: oklch(68% 0.16 25);
+  --danger-hover: oklch(74% 0.16 25);
+  --danger-soft: oklch(28% 0.06 25);
+  --danger-soft-fg: oklch(82% 0.10 25);
+
+  --warning: oklch(78% 0.13 75);
+  --warning-soft: oklch(28% 0.06 75);
+  --warning-soft-fg: oklch(84% 0.10 75);
+
+  --info: oklch(70% 0.12 240);
+  --info-soft: oklch(28% 0.05 240);
+  --info-soft-fg: oklch(82% 0.10 240);
+
+  --success: oklch(70% 0.12 150);
+  --success-soft: oklch(28% 0.05 150);
+  --success-soft-fg: oklch(85% 0.10 150);
+
+  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.4);
+  --shadow: 0 1px 3px oklch(0% 0 0 / 0.4), 0 6px 16px oklch(0% 0 0 / 0.3);
+  --shadow-lg: 0 4px 16px oklch(0% 0 0 / 0.5), 0 24px 56px oklch(0% 0 0 / 0.5);
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-app);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background: var(--primary-soft);
+    color: var(--primary-soft-fg);
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 8px; border: 2px solid var(--bg-app); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--fg-subtle); }
+}

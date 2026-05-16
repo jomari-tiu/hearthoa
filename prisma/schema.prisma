@@ -1,0 +1,538 @@
+// HearthHOA — Phase 1 data model
+// Sourced from .plans/04-Data-Model.md.
+// Postgres + pgvector. Single-tenant Phase 1 but every domain table carries hoa_id.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+// ============================================================
+// Enums
+// ============================================================
+
+enum Role {
+  resident
+  admin
+}
+
+enum UserStatus {
+  pending
+  active
+  disabled
+}
+
+enum DuesCadence {
+  monthly
+  quarterly
+  annual
+}
+
+enum DirectoryVisibility {
+  off
+  admins_only
+  all_residents
+}
+
+enum AnnouncementPriority {
+  general
+  critical
+}
+
+enum DuesStatus {
+  unpaid
+  partial
+  paid
+  late
+  waived
+}
+
+enum PaymentMethod {
+  cash
+  check
+  transfer
+  card
+  ach
+  waiver
+}
+
+enum DocumentCategory {
+  bylaws
+  ccrs
+  minutes
+  financials
+  forms
+  other
+}
+
+enum PiiReviewStatus {
+  pending
+  acknowledged_safe
+  flagged
+  excluded
+}
+
+enum MaintenanceCategory {
+  landscaping
+  plumbing
+  electrical
+  roads
+  pool
+  other
+}
+
+enum MaintenanceStatus {
+  new
+  in_progress
+  resolved
+  closed
+}
+
+enum ChatRole {
+  user
+  assistant
+}
+
+enum FeedbackTone {
+  positive
+  negative
+}
+
+enum NotificationChannel {
+  email
+  sms
+}
+
+enum NotificationStatus {
+  sent
+  failed
+  bounced
+}
+
+// ============================================================
+// Tenant
+// ============================================================
+
+model Hoa {
+  id                          String              @id @default(uuid()) @db.Uuid
+  name                        String
+  slug                        String              @unique
+  supportedLanguages          String[]            @map("supported_languages")
+  defaultLanguage             String              @default("en") @map("default_language")
+  duesCadence                 DuesCadence         @map("dues_cadence")
+  timezone                    String
+  residentDirectoryVisibility DirectoryVisibility @default(off) @map("resident_directory_visibility")
+  branding                    Json?
+  aiMonthlyBudgetCents        Int                 @default(20000) @map("ai_monthly_budget_cents")
+  aiPerUserDailyMessages      Int                 @default(20) @map("ai_per_user_daily_messages")
+  createdAt                   DateTime            @default(now()) @map("created_at")
+  updatedAt                   DateTime            @updatedAt @map("updated_at")
+  deletedAt                   DateTime?           @map("deleted_at")
+
+  users                  User[]
+  units                  Unit[]
+  unitResidents          UnitResident[]
+  announcements          Announcement[]
+  announcementTrans      AnnouncementTranslation[]
+  dues                   Due[]
+  payments               Payment[]
+  documents              Document[]
+  documentChunks         DocumentChunk[]
+  maintenanceRequests    MaintenanceRequest[]
+  boardMembers           BoardMember[]
+  chatSessions           ChatSession[]
+  chatMessages           ChatMessage[]
+  auditLogs              AuditLog[]
+  notificationLogs       NotificationLog[]
+
+  @@map("hoas")
+}
+
+// ============================================================
+// People & places
+// ============================================================
+
+model User {
+  id                String     @id @default(uuid()) @db.Uuid
+  hoaId             String     @map("hoa_id") @db.Uuid
+  email             String
+  passwordHash      String     @map("password_hash")
+  name              String
+  phone             String?
+  role              Role
+  status            UserStatus @default(pending)
+  preferredLanguage String     @default("en") @map("preferred_language")
+  directoryOptOut   Boolean    @default(false) @map("directory_opt_out")
+  emailVerifiedAt   DateTime?  @map("email_verified_at")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+  deletedAt         DateTime?  @map("deleted_at")
+
+  hoa                  Hoa                          @relation(fields: [hoaId], references: [id])
+  residencies          UnitResident[]
+  authoredAnnouncements Announcement[]              @relation("AuthoredAnnouncements")
+  reviewedTranslations AnnouncementTranslation[]    @relation("ReviewedTranslations")
+  paymentsRecorded     Payment[]                    @relation("PaymentsRecorded")
+  paymentsMade         Payment[]                    @relation("PaymentsMade")
+  uploadedDocuments    Document[]                   @relation("UploadedDocuments")
+  piiReviewed          Document[]                   @relation("PiiReviewedBy")
+  submittedRequests    MaintenanceRequest[]
+  chatSessions         ChatSession[]
+  chatMessages         ChatMessage[]
+  notificationPrefs    UserNotificationPreference[]
+  auditLogs            AuditLog[]
+  notificationLogs     NotificationLog[]
+
+  @@unique([hoaId, email], map: "users_hoa_email_unique")
+  @@index([hoaId])
+  @@map("users")
+}
+
+model Unit {
+  id          String    @id @default(uuid()) @db.Uuid
+  hoaId       String    @map("hoa_id") @db.Uuid
+  address     String
+  unitNumber  String?   @map("unit_number")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  hoa                 Hoa                  @relation(fields: [hoaId], references: [id])
+  residents           UnitResident[]
+  dues                Due[]
+  maintenanceRequests MaintenanceRequest[]
+
+  @@index([hoaId])
+  @@map("units")
+}
+
+model UnitResident {
+  id         String    @id @default(uuid()) @db.Uuid
+  hoaId      String    @map("hoa_id") @db.Uuid
+  unitId     String    @map("unit_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  startDate  DateTime  @map("start_date") @db.Date
+  endDate    DateTime? @map("end_date") @db.Date
+  isPrimary  Boolean   @default(false) @map("is_primary")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  hoa  Hoa  @relation(fields: [hoaId], references: [id])
+  unit Unit @relation(fields: [unitId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, endDate])
+  @@index([unitId, endDate])
+  @@map("unit_residents")
+}
+
+// ============================================================
+// Announcements
+// ============================================================
+
+model Announcement {
+  id             String               @id @default(uuid()) @db.Uuid
+  hoaId          String               @map("hoa_id") @db.Uuid
+  authorId       String               @map("author_id") @db.Uuid
+  sourceLanguage String               @default("en") @map("source_language")
+  title          String
+  body           String
+  imageUrl       String?              @map("image_url")
+  priority       AnnouncementPriority @default(general)
+  isPinned       Boolean              @default(false) @map("is_pinned")
+  pinnedUntil    DateTime?            @map("pinned_until")
+  publishedAt    DateTime?            @map("published_at")
+  scheduledFor   DateTime?            @map("scheduled_for")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  hoa          Hoa                       @relation(fields: [hoaId], references: [id])
+  author       User                      @relation("AuthoredAnnouncements", fields: [authorId], references: [id])
+  translations AnnouncementTranslation[]
+
+  @@index([hoaId, publishedAt(sort: Desc)])
+  @@index([hoaId, isPinned])
+  @@map("announcements")
+}
+
+model AnnouncementTranslation {
+  id               String    @id @default(uuid()) @db.Uuid
+  hoaId            String    @map("hoa_id") @db.Uuid
+  announcementId   String    @map("announcement_id") @db.Uuid
+  language         String
+  title            String
+  body             String
+  isAutoTranslated Boolean   @default(true) @map("is_auto_translated")
+  reviewedById     String?   @map("reviewed_by") @db.Uuid
+  reviewedAt       DateTime? @map("reviewed_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  hoa          Hoa          @relation(fields: [hoaId], references: [id])
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  reviewedBy   User?        @relation("ReviewedTranslations", fields: [reviewedById], references: [id])
+
+  @@unique([announcementId, language])
+  @@map("announcement_translations")
+}
+
+// ============================================================
+// Money
+// ============================================================
+
+model Due {
+  id           String     @id @default(uuid()) @db.Uuid
+  hoaId        String     @map("hoa_id") @db.Uuid
+  unitId       String     @map("unit_id") @db.Uuid
+  period       String
+  amountCents  Int        @map("amount_cents")
+  dueDate      DateTime   @map("due_date") @db.Date
+  status       DuesStatus @default(unpaid)
+  notes        String?
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  hoa          Hoa          @relation(fields: [hoaId], references: [id])
+  unit         Unit         @relation(fields: [unitId], references: [id])
+  allocations  DuePayment[]
+
+  @@unique([hoaId, unitId, period])
+  @@index([hoaId, status])
+  @@map("dues")
+}
+
+model Payment {
+  id                String        @id @default(uuid()) @db.Uuid
+  hoaId             String        @map("hoa_id") @db.Uuid
+  paidByUserId      String?       @map("paid_by_user_id") @db.Uuid
+  amountCents       Int           @map("amount_cents")
+  method            PaymentMethod
+  reference         String?
+  paidAt            DateTime      @map("paid_at")
+  recordedByUserId  String        @map("recorded_by_user_id") @db.Uuid
+  notes             String?
+  externalId        String?       @map("external_id")
+  createdAt         DateTime      @default(now()) @map("created_at")
+
+  hoa         Hoa          @relation(fields: [hoaId], references: [id])
+  paidBy      User?        @relation("PaymentsMade", fields: [paidByUserId], references: [id])
+  recordedBy  User         @relation("PaymentsRecorded", fields: [recordedByUserId], references: [id])
+  allocations DuePayment[]
+
+  @@unique([hoaId, externalId], map: "payments_hoa_external_id_unique")
+  @@index([hoaId, paidAt(sort: Desc)])
+  @@map("payments")
+}
+
+model DuePayment {
+  id              String   @id @default(uuid()) @db.Uuid
+  dueId           String   @map("due_id") @db.Uuid
+  paymentId       String   @map("payment_id") @db.Uuid
+  allocatedCents  Int      @map("allocated_cents")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  due     Due     @relation(fields: [dueId], references: [id])
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@index([dueId])
+  @@index([paymentId])
+  @@map("due_payments")
+}
+
+// ============================================================
+// Documents
+// ============================================================
+
+model Document {
+  id                 String           @id @default(uuid()) @db.Uuid
+  hoaId              String           @map("hoa_id") @db.Uuid
+  title              String
+  category           DocumentCategory
+  fileUrl            String           @map("file_url")
+  fileType           String           @map("file_type")
+  fileSizeBytes      BigInt           @map("file_size_bytes")
+  uploadedById       String           @map("uploaded_by") @db.Uuid
+  version            Int              @default(1)
+  isChatbotIndexed   Boolean          @default(false) @map("is_chatbot_indexed")
+  piiReviewStatus    PiiReviewStatus  @default(pending) @map("pii_review_status")
+  piiReviewedById    String?          @map("pii_reviewed_by") @db.Uuid
+  piiReviewedAt      DateTime?        @map("pii_reviewed_at")
+  parentDocumentId   String?          @map("parent_document_id") @db.Uuid
+  createdAt          DateTime         @default(now()) @map("created_at")
+
+  hoa            Hoa             @relation(fields: [hoaId], references: [id])
+  uploadedBy     User            @relation("UploadedDocuments", fields: [uploadedById], references: [id])
+  piiReviewedBy  User?           @relation("PiiReviewedBy", fields: [piiReviewedById], references: [id])
+  parent         Document?       @relation("DocumentVersions", fields: [parentDocumentId], references: [id])
+  versions       Document[]      @relation("DocumentVersions")
+  chunks         DocumentChunk[]
+
+  @@index([hoaId, category])
+  @@map("documents")
+}
+
+model DocumentChunk {
+  id              String  @id @default(uuid()) @db.Uuid
+  hoaId           String  @map("hoa_id") @db.Uuid
+  documentId      String  @map("document_id") @db.Uuid
+  chunkIndex      Int     @map("chunk_index")
+  content         String
+  pageNumber      Int?    @map("page_number")
+  section         String?
+  embeddingModel  String  @map("embedding_model")
+  embedding       Unsupported("vector(1536)")?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  hoa      Hoa      @relation(fields: [hoaId], references: [id])
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, chunkIndex])
+  @@map("document_chunks")
+}
+
+// ============================================================
+// Maintenance
+// ============================================================
+
+model MaintenanceRequest {
+  id            String              @id @default(uuid()) @db.Uuid
+  hoaId         String              @map("hoa_id") @db.Uuid
+  submittedById String              @map("submitted_by") @db.Uuid
+  unitId        String              @map("unit_id") @db.Uuid
+  title         String
+  description   String
+  category      MaintenanceCategory
+  photoUrl      String?             @map("photo_url")
+  status        MaintenanceStatus   @default(new)
+  assignedTo    String?             @map("assigned_to")
+  adminNotes    String?             @map("admin_notes")
+  resolvedAt    DateTime?           @map("resolved_at")
+  closedAt      DateTime?           @map("closed_at")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+
+  hoa         Hoa  @relation(fields: [hoaId], references: [id])
+  submittedBy User @relation(fields: [submittedById], references: [id])
+  unit        Unit @relation(fields: [unitId], references: [id])
+
+  @@index([hoaId, status, createdAt])
+  @@map("maintenance_requests")
+}
+
+// ============================================================
+// Board directory
+// ============================================================
+
+model BoardMember {
+  id            String   @id @default(uuid()) @db.Uuid
+  hoaId         String   @map("hoa_id") @db.Uuid
+  name          String
+  role          String
+  email         String?
+  photoUrl      String?  @map("photo_url")
+  termEnd       DateTime? @map("term_end") @db.Date
+  displayOrder  Int      @default(0) @map("display_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  hoa Hoa @relation(fields: [hoaId], references: [id])
+
+  @@index([hoaId, displayOrder])
+  @@map("board_members")
+}
+
+// ============================================================
+// Chat
+// ============================================================
+
+model ChatSession {
+  id        String    @id @default(uuid()) @db.Uuid
+  hoaId     String    @map("hoa_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  startedAt DateTime  @default(now()) @map("started_at")
+  endedAt   DateTime? @map("ended_at")
+
+  hoa      Hoa           @relation(fields: [hoaId], references: [id])
+  user     User          @relation(fields: [userId], references: [id])
+  messages ChatMessage[]
+
+  @@index([userId, startedAt(sort: Desc)])
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id         String        @id @default(uuid()) @db.Uuid
+  hoaId      String        @map("hoa_id") @db.Uuid
+  sessionId  String        @map("session_id") @db.Uuid
+  userId     String?       @map("user_id") @db.Uuid
+  role       ChatRole
+  content    String
+  citations  Json?
+  feedback   FeedbackTone?
+  tokensIn   Int?          @map("tokens_in")
+  tokensOut  Int?          @map("tokens_out")
+  costCents  Int?          @map("cost_cents")
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  hoa     Hoa         @relation(fields: [hoaId], references: [id])
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User?       @relation(fields: [userId], references: [id])
+
+  @@index([sessionId, createdAt])
+  @@index([hoaId, userId, createdAt])
+  @@map("chat_messages")
+}
+
+// ============================================================
+// Notifications & audit
+// ============================================================
+
+model UserNotificationPreference {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  type          String
+  emailEnabled  Boolean  @default(true) @map("email_enabled")
+  smsEnabled    Boolean  @default(false) @map("sms_enabled")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, type])
+  @@map("user_notification_preferences")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  hoaId       String   @map("hoa_id") @db.Uuid
+  userId      String?  @map("user_id") @db.Uuid
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id") @db.Uuid
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  hoa  Hoa   @relation(fields: [hoaId], references: [id])
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([hoaId, createdAt(sort: Desc)])
+  @@map("audit_log")
+}
+
+model NotificationLog {
+  id        String              @id @default(uuid()) @db.Uuid
+  hoaId     String              @map("hoa_id") @db.Uuid
+  userId    String              @map("user_id") @db.Uuid
+  channel   NotificationChannel
+  type      String
+  subject   String
+  sentAt    DateTime            @default(now()) @map("sent_at")
+  status    NotificationStatus  @default(sent)
+
+  hoa  Hoa  @relation(fields: [hoaId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([hoaId, sentAt(sort: Desc)])
+  @@map("notification_log")
+}
